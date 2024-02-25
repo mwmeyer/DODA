@@ -1,0 +1,9 @@
+textual==0.47.1
+textual-dev==1.4.0
+python-dotenv==1.0.0
+pyperclip==1.8.2
+openai==1.11.1
+requests==2.31.0
+GitPython==3.1.42
+pexpect==4.9.0
+python-gitlab==4.4.0

@@ -1,0 +1,95 @@
+[
+{
+    "type": "function",
+    "function": {
+        "name": "run_command",
+        "description": "function to execute a terminal command on the server",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "The command to run, e.g. ls"
+                }
+            },
+            "required": ["command"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "file_download",
+        "description": "function to download file into ./workspace",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "The url to the file"
+                }
+            },
+            "required": ["url"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "git_diff",
+        "description": "Function to return a git diff",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "repo_name": {
+                    "type": "string",
+                    "description": "name of the repo in the ./workspace directory"
+                }
+            },
+            "required": ["repo_name"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "git_clone",
+        "description": "function to clone a git repo and load into workspace",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "repo_url": {
+                    "type": "string",
+                    "description": "The public url to a git repo"
+                }
+            },
+            "required": ["repo_url"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "gitlab_snippet_create",
+        "description": "Creates a new snippet in GitLab.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "The title of the snippet"
+                },
+                "file_name": {
+                    "type": "string",
+                    "description": "The name of the file to be included in the snippet"
+                },
+                "content": {
+                    "type": "string",
+                    "description": "The content of the file to be included in the snippet"
+                }
+            },
+            "required": ["title", "file_name", "content"]
+        }
+    }
+}
+]
