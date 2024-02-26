@@ -16,7 +16,7 @@ pip install -r requirements.txt
 cp .env.example .env # add openAI ... other values optional
 ```
 
-### Optional .env files
+### Optional .env vars
 
 By default, all functions require confirmation before the LLM calls them.
 To disable this, set `FUNCTION_CONFIRMATION_REQUIRED=false` in the `.env` file.
@@ -31,3 +31,4 @@ In order to create gitlab snippets, you will need to generate a private token an
 
 To view a debug console in another tab, run:
 `textual console`
+

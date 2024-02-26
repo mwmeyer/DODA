@@ -62,6 +62,11 @@ class Conversation:
         # print("****self.available_functions", self.available_functions)
         self.pending_confirmation = False
         self.last_pending_message = None
+
+        # create ./workspace if it doesn't exist
+        # This directory is used by LLM funtions as a "default" working directory.
+        if not os.path.exists('./workspace'):
+            os.makedirs('./workspace')
     
     async def handle_confirmation(self, function_data, response_message):
         """Handle the creation of a confirmation dialog."""
