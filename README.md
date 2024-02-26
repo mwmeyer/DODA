@@ -1,6 +1,8 @@
 # DODO
 
-DODA Offers Dev Assistance
+DODA Offers Dev Assistance.
+
+It is a full featured LLM chat interface that runs natively within a developers terminal to help with system administration, scripting, and any other CLI oriented task.
 
 ## Setup
 
