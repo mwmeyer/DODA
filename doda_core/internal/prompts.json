@@ -8,7 +8,6 @@
         "List the files in my workspace",
         "What processes are running?",
         "Check cpu usage",
-        "Report disk utilization",
-        "Write a unix poem"
+        "Report disk utilization"
     ]
 }

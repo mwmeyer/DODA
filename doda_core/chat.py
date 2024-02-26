@@ -13,7 +13,7 @@ openai = AsyncOpenAI(api_key=settings.OPENAI_KEY)
 class Conversation:
     """DODA conversation manager."""
 
-    # llm_model: str = "gpt-3.5-turbo-1106"
+    # llm_model: str = "gpt-3.5-turbo-0125"
     llm_model: str = "gpt-4-0125-preview"
     
     def generate_system_content(self):
