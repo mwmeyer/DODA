@@ -91,5 +91,30 @@
             "required": ["title", "file_name", "content"]
         }
     }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "github_gist_create",
+        "description": "Creates a new gist on github.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "The title of the gist"
+                },
+                "file_name": {
+                    "type": "string",
+                    "description": "The name of the file to be included in the gist"
+                },
+                "content": {
+                    "type": "string",
+                    "description": "The content of the file to be included in the gist"
+                }
+            },
+            "required": ["title", "file_name", "content"]
+        }
+    }
 }
 ]
