@@ -1,0 +1,93 @@
+Screen {
+    layout: horizontal;
+}
+
+#sidebar-container {
+    width: 20%;
+    height: 100%;
+    border-right: solid $primary-lighten-2;
+}
+
+#editor-container {
+    width: 1fr;
+    height: 100%;
+    border-right: solid $primary-lighten-2;
+}
+
+#chat-container {
+    width: 30%;
+    height: 100%;
+    layout: vertical;
+}
+
+#editor-header {
+    height: 2;
+    padding: 0 1;
+    background: $panel;
+    border-bottom: solid $primary-lighten-2;
+}
+
+#file-path-label {
+    width: 1fr;
+    content-align: left middle;
+    color: $text;
+}
+
+#save-status {
+    width: auto;
+    color: $warning;
+    content-align: right middle;
+}
+
+#workspace-textarea {
+    height: 100%;
+    border: none;
+    padding: 1;
+}
+
+#chat-messages {
+    height: 1fr;
+    padding: 1;
+}
+
+#messages-view {
+    padding: 1;
+}
+
+DirectoryTree {
+    height: 100%;
+    scrollbar-gutter: stable;
+    overflow-y: auto;
+    background: $surface;
+    padding: 1;
+}
+
+/* Voice mode styles */
+VoiceMode {
+    width: 5%;
+    min-width: 8;
+    height: 100%;
+    background: $surface;
+    border-left: solid $primary;
+    layout: vertical;
+    align: center top;
+    padding: 1;
+}
+
+VoiceMode #voice-status {
+    text-style: bold;
+    margin-bottom: 1;
+    content-align: center middle;
+    display: none;
+}
+
+VoiceMode Button {
+    margin-top: 1;
+    width: 100%;
+    min-height: 3;
+    background: transparent;
+}
+
+VoiceMode Button:hover {
+    background: $primary-lighten-2;
+}
