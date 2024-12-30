@@ -1,5 +1,5 @@
 from textual.app import App, ComposeResult
-from textual.containers import Container, Horizontal, Grid
+from textual.containers import Container, Horizontal, Vertical, Grid
 from textual.widgets import Button, DirectoryTree, Label, TextArea, Static, Input, Select
 from textual.message import Message
 from textual.binding import Binding
@@ -11,6 +11,9 @@ import json
 from chat import Conversation
 import os
 from typing import Optional
+from git_tree import GitDirectoryTree
+from git_preview import GitPreview, FileSelected
+from pathlib import Path
 
 class SavePathSelected(Message):
     """Message sent when a save path is selected."""
@@ -164,26 +167,30 @@ class DodaTUI(App):
     ]
 
     def compose(self) -> ComposeResult:
-        """Compose our UI."""
+        """Create child widgets for the app."""
         with Horizontal():
             with Container(id="sidebar-container"):
-                yield DirectoryTree(self.home_dir, id="workspace-tree")
+                with Horizontal(id="tree-header"):
+                    yield Button("Git Filter", id="git-toggle", classes="header-button")
+                with Vertical(id="sidebar-content"):
+                    yield GitDirectoryTree(self.home_dir, id="workspace-tree")
+                    yield GitPreview(id="git-preview")
             with Container(id="editor-container"):
                 with Horizontal(id="editor-header"):
                     yield Label("No file open", id="file-path-label")
                     yield Label("", id="save-status")
-                    yield Button("💾", id="save-button", classes="header-button")
+                    yield Button("", id="save-button", classes="header-button")
                 yield TextArea(id="workspace-textarea")
             with Container(id="chat-container"):
                 yield Static("Welcome! Open a file and ask questions about the code.", id="chat-messages")
                 yield ChatInput()
             with Container(id="actions-container"):
-                yield Button("💽", id="tree-toggle", classes="action-button")
-                yield Button("🤖", id="ai-button", classes="action-button")
-                yield Button("⚙️", id="settings-button", classes="action-button")
-                yield Button("🔍", id="search-button", classes="action-button")
-                yield Button("❓", id="help-button", classes="action-button")
-                yield Button("🎤", variant="default", id="voice-toggle")
+                yield Button("Tree", id="tree-toggle", classes="action-button")
+                yield Button("AI", id="ai-button", classes="action-button")
+                yield Button("Settings", id="settings-button", classes="action-button")
+                yield Button("Search", id="search-button", classes="action-button")
+                yield Button("Help", id="help-button", classes="action-button")
+                yield Button("Voice", variant="default", id="voice-toggle")
                 yield Label("Voice Mode", id="voice-status")
 
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
@@ -228,33 +235,80 @@ class DodaTUI(App):
         self.current_file_path = message.path
         self._save_file()
 
-    def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
-        """Handle file selection."""
+    @on(DirectoryTree.DirectorySelected)
+    def handle_directory_selected(self, event: DirectoryTree.DirectorySelected) -> None:
+        """Handle directory selection in the tree."""
+        # Update git preview if this is in a git repo
+        git_preview = self.query_one("#git-preview", GitPreview)
+        path = Path(event.path)
+        if (path / ".git").exists():
+            git_preview.current_repo = path
+        else:
+            git_preview.current_repo = None
+
+    @on(DirectoryTree.FileSelected)
+    def handle_file_selected(self, event: DirectoryTree.FileSelected) -> None:
+        """Handle file selection in the directory tree."""
         try:
             if self.has_unsaved_changes:
                 self.notify("Warning: You have unsaved changes!", severity="warning")
-            
-            self.current_file_path = str(event.path)
-            with open(event.path) as file:
-                content = file.read()
-            
+                
+            path = Path(event.path)
+            if not path.exists():
+                self.notify(f"File not found: {path}", severity="error")
+                return
+                
+            with open(path, "r") as f:
+                content = f.read()
+                
             text_area = self.query_one("#workspace-textarea", TextArea)
             text_area.load_text(content)
             
-            extension = event.path.suffix.lower()
-            if extension in ['.py', '.js', '.html', '.css', '.json']:
-                text_area.language = extension[1:]  # Remove the dot
+            # Update file path label
+            label = self.query_one("#file-path-label", Label)
+            label.update(str(path))
             
-            # Update file path label and save status
-            file_label = self.query_one("#file-path-label", Label)
-            file_label.update(os.path.basename(self.current_file_path))
-            save_status = self.query_one("#save-status", Label)
-            save_status.update("")
+            self.current_file_path = path
             self.has_unsaved_changes = False
             
             self.sub_title = str(event.path)
+            
+            # Update git preview if this is in a git repo
+            git_preview = self.query_one("#git-preview", GitPreview)
+            while path != Path("/"):
+                if (path / ".git").exists():
+                    git_preview.current_repo = path
+                    break
+                path = path.parent
+            else:
+                git_preview.current_repo = None
         except Exception as e:
             self.notify(f"Error opening file: {str(e)}", severity="error")
+
+    @on(FileSelected)  
+    def handle_git_file_selected(self, message: FileSelected) -> None:
+        """Handle git file selection."""
+        try:
+            git_preview = self.query_one("#git-preview", GitPreview)
+            text_area = self.query_one("#workspace-textarea", TextArea)
+            
+            if message.is_modified:
+                # Show diff for modified file
+                diff = git_preview.get_file_diff(message.path)
+                text_area.load_text(diff)
+            else:
+                # Show contents of untracked file
+                path = git_preview.current_repo / message.path
+                with open(path, "r") as f:
+                    content = f.read()
+                text_area.load_text(content)
+            
+            # Update file path label
+            label = self.query_one("#file-path-label", Label)
+            label.update(f"Git: {message.path}")
+            
+        except Exception as e:
+            self.notify(f"Error showing file: {str(e)}", severity="error")
 
     def on_mount(self) -> None:
         """Handle app mount."""
@@ -319,6 +373,15 @@ class DodaTUI(App):
     def on_tree_toggle_pressed(self, event: Button.Pressed) -> None:
         """Handle tree toggle button press."""
         self.action_toggle_tree()
+
+    @on(Button.Pressed, "#git-toggle")
+    def on_git_toggle_pressed(self) -> None:
+        """Handle git toggle button press."""
+        tree = self.query_one("#workspace-tree", GitDirectoryTree)
+        tree.toggle_git_only()
+        # Update button text based on state
+        button = self.query_one("#git-toggle", Button)
+        button.label = "All Files" if tree.show_only_git else "Git Filter"
 
     @on(Button.Pressed, "#chat-send")
     async def on_send_pressed(self, event: Button.Pressed) -> None:
