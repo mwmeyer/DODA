@@ -1,15 +1,81 @@
 from textual.app import App, ComposeResult
-from textual.binding import Binding
-from textual.containers import Grid, Container, Horizontal, VerticalScroll
-from textual.widget import Widget
-from textual.reactive import var
-from textual.widgets import DirectoryTree, Button, Input, Static, TextArea, Label, Select
-from textual import on
-from textual.widgets._select import SelectCurrent
+from textual.containers import Container, Horizontal, Grid
+from textual.widgets import Button, DirectoryTree, Label, TextArea, Static, Input, Select
 from textual.message import Message
+from textual.binding import Binding
+from textual.screen import ModalScreen
+from textual import on
+from textual.reactive import var
+from textual.widgets._select import SelectCurrent
 import json
 from chat import Conversation
 import os
+from typing import Optional
+
+class SavePathSelected(Message):
+    """Message sent when a save path is selected."""
+    def __init__(self, path: str) -> None:
+        self.path = path
+        super().__init__()
+
+class SaveDialog(ModalScreen):
+    """Save file dialog."""
+    
+    DEFAULT_CSS = """
+    SaveDialog {
+        align: center middle;
+    }
+
+    #save-dialog {
+        grid-size: 2;
+        grid-gutter: 1 2;
+        grid-rows: 4;
+        padding: 1 2;
+        width: 60;
+        height: 11;
+        border: thick $background 80%;
+        background: $surface;
+    }
+
+    #save-prompt {
+        column-span: 2;
+        height: 1;
+        content-align: center middle;
+    }
+
+    #save-path {
+        column-span: 2;
+        height: 3;
+    }
+
+    #save-button {
+        width: 100%;
+    }
+
+    #cancel-button {
+        width: 100%;
+    }
+    """
+    
+    def compose(self) -> ComposeResult:
+        """Compose the save dialog."""
+        with Container(id="save-dialog"):
+            yield Label("Enter file path to save:", id="save-prompt")
+            yield Input(value=os.path.expanduser("~"), id="save-path")
+            yield Button("Save", id="save-button", variant="primary")
+            yield Button("Cancel", id="cancel-button")
+    
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button press."""
+        if event.button.id == "save-button":
+            path = self.query_one("#save-path").value
+            self.app.post_message(SavePathSelected(path))
+        self.app.pop_screen()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Handle input submission."""
+        self.app.post_message(SavePathSelected(event.value))
+        self.app.pop_screen()
 
 class ChatMessage(Static):
     """A chat message widget."""
@@ -90,9 +156,9 @@ class DodaTUI(App):
     has_unsaved_changes = var(False)
 
     BINDINGS = [
-        Binding("q", "quit", "Quit", key_display="Q / CTRL+C"),
+        Binding("ctrl+s", "save", "Save File", show=True),
+        Binding("ctrl+q", "quit", "Quit", key_display="Q / CTRL+C"),
         Binding("ctrl+b", "toggle_sidebar", "Sidebar"),
-        Binding("ctrl+s", "save_current_file", "Save File", key_display="Ctrl+S"),
         Binding("ctrl+\\", "toggle_chat", "Toggle Chat"),
         Binding("ctrl+v", "toggle_voice", "Voice Mode", key_display="Ctrl+V")
     ]
@@ -106,6 +172,7 @@ class DodaTUI(App):
                 with Horizontal(id="editor-header"):
                     yield Label("No file open", id="file-path-label")
                     yield Label("", id="save-status")
+                    yield Button("💾", id="save-button", classes="header-button")
                 yield TextArea(id="workspace-textarea")
             with Container(id="chat-container"):
                 yield Static("Welcome! Open a file and ask questions about the code.", id="chat-messages")
@@ -126,22 +193,40 @@ class DodaTUI(App):
             save_status = self.query_one("#save-status", Label)
             save_status.update("*")
 
-    def action_save_current_file(self) -> None:
+    def action_save(self) -> None:
         """Save the current file."""
-        text_area = self.query_one("#workspace-textarea", TextArea)
-        file_content = text_area.text
-        if self.current_file_path:
-            try:
-                with open(self.current_file_path, 'w') as file:
-                    file.write(file_content)
-                self.has_unsaved_changes = False
-                save_status = self.query_one("#save-status", Label)
-                save_status.update("")
-                self.notify("File saved successfully!")
-            except Exception as e:
-                self.notify(f"Error saving file: {str(e)}", severity="error")
-        else:
-            self.notify("No file is currently open", severity="warning")
+        if not self.current_file_path:
+            # No file open, show save dialog
+            self.push_screen(SaveDialog())
+            return
+        
+        self._save_file()
+
+    def _save_file(self) -> None:
+        """Save the file to disk."""
+        try:
+            text_area = self.query_one("#workspace-textarea", TextArea)
+            with open(self.current_file_path, "w") as file:
+                file.write(text_area.text)
+            
+            self.has_unsaved_changes = False
+            save_status = self.query_one("#save-status", Label)
+            save_status.update("")
+            
+            # Update file path label after successful save
+            file_label = self.query_one("#file-path-label", Label)
+            file_label.update(os.path.basename(self.current_file_path))
+            self.sub_title = str(self.current_file_path)
+            
+            self.notify("File saved successfully!")
+        except Exception as e:
+            self.notify(f"Error saving file: {str(e)}", severity="error")
+
+    @on(SavePathSelected)
+    def handle_save_path(self, message: SavePathSelected) -> None:
+        """Handle save path selection."""
+        self.current_file_path = message.path
+        self._save_file()
 
     def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
         """Handle file selection."""
@@ -283,3 +368,8 @@ class DodaTUI(App):
             messages_container.scroll_end(animate=False)
         except Exception as e:
             self.notify(f"Error getting AI response: {str(e)}", severity="error")
+
+    @on(Button.Pressed, "#save-button")
+    def on_save_button_pressed(self) -> None:
+        """Handle save button press."""
+        self.action_save()

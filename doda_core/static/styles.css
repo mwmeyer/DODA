@@ -79,6 +79,18 @@ Screen {
     border-bottom: solid $primary-lighten-2;
 }
 
+.header-button {
+    background: transparent;
+    border: none;
+    height: 2;
+    width: 4;
+    content-align: center middle;
+}
+
+.header-button:hover {
+    background: $primary-lighten-2;
+}
+
 #file-path-label {
     width: 1fr;
     content-align: left middle;
@@ -89,6 +101,7 @@ Screen {
     width: auto;
     color: $warning;
     content-align: right middle;
+    margin-right: 1;
 }
 
 #workspace-textarea {
