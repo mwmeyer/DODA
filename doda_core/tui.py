@@ -142,6 +142,13 @@ class ChatInput(Container):
         yield Input(placeholder="Ask about the code...", id="chat-input")
         yield Button("Send", id="chat-send")
 
+class DiffView(Static):
+    """A widget to display colored diffs."""
+    
+    def update_content(self, text: str) -> None:
+        """Update the content with rich text markup."""
+        self.update(text)
+
 class DodaTUI(App):
     """DODA TUI application."""
     
@@ -181,6 +188,7 @@ class DodaTUI(App):
                     yield Label("", id="save-status")
                     yield Button("", id="save-button", classes="header-button")
                 yield TextArea(id="workspace-textarea")
+                yield DiffView("", id="diff-view", classes="hidden")
             with Container(id="chat-container"):
                 yield Static("Welcome! Open a file and ask questions about the code.", id="chat-messages")
                 yield ChatInput()
@@ -291,16 +299,21 @@ class DodaTUI(App):
         try:
             git_preview = self.query_one("#git-preview", GitPreview)
             text_area = self.query_one("#workspace-textarea", TextArea)
+            diff_view = self.query_one("#diff-view", DiffView)
             
             if message.is_modified:
-                # Show diff for modified file
+                # Show colored diff for modified file
                 diff = git_preview.get_file_diff(message.path)
-                text_area.load_text(diff)
+                text_area.add_class("hidden")
+                diff_view.remove_class("hidden")
+                diff_view.update_content(diff)
             else:
                 # Show contents of untracked file
                 path = git_preview.current_repo / message.path
                 with open(path, "r") as f:
                     content = f.read()
+                diff_view.add_class("hidden")
+                text_area.remove_class("hidden")
                 text_area.load_text(content)
             
             # Update file path label

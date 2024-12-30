@@ -65,6 +65,11 @@ Screen {
     margin-right: 1;
 }
 
+#git-preview-container {
+    height: 100%;
+    width: 100%;
+}
+
 #git-content {
     height: 1fr;
     width: 100%;
@@ -75,11 +80,23 @@ Screen {
 #git-actions {
     width: 100%;
     height: 3;
+    dock: bottom;
+    background: $panel;
+    border-top: solid $primary;
 }
 
 #git-actions Button {
     width: 1fr;
     height: 100%;
+    border: none;
+}
+
+#accept-changes {
+    background: $success;
+}
+
+#reject-changes {
+    background: $error;
 }
 
 #editor-container {
@@ -221,4 +238,17 @@ ClickableFile {
 ClickableFile:hover {
     background: $boost;
     text-style: bold;
+}
+
+DiffView {
+    background: $surface;
+    color: $text;
+    overflow-y: scroll;
+    padding: 1;
+    width: 100%;
+    height: 100%;
+}
+
+.hidden {
+    display: none;
 }

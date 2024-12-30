@@ -30,13 +30,43 @@ class GitPreview(Container):
     
     current_repo: Optional[Path] = reactive(None)
     
+    DEFAULT_CSS = """
+    GitPreview {
+        layout: vertical;
+        height: 2fr;
+        min-height: 5;
+        width: 100%;
+        border-top: solid $primary;
+    }
+    
+    #git-content {
+        height: 1fr;
+        width: 100%;
+        overflow: auto;
+        padding: 1;
+    }
+    
+    #git-actions {
+        width: 100%;
+        height: 3;
+        dock: bottom;
+        background: $panel;
+        border-top: solid $primary;
+    }
+    
+    #git-actions Button {
+        width: 1fr;
+        height: 100%;
+        border: none;
+    }
+    """
+    
     def compose(self):
         """Create child widgets."""
-        with Vertical():
-            yield Static("", id="git-content")
-            with Horizontal(id="git-actions"):
-                yield Button("✓", id="accept-changes", variant="success", disabled=True)
-                yield Button("✗", id="reject-changes", variant="error", disabled=True)
+        yield Static("", id="git-content")
+        with Horizontal(id="git-actions"):
+            yield Button("Accept", id="accept-changes", variant="success", disabled=True)
+            yield Button("Reject", id="reject-changes", variant="error", disabled=True)
     
     def _run_git_command(self, args: list[str]) -> str:
         """Run a git command and return its output."""
@@ -57,7 +87,20 @@ class GitPreview(Container):
     
     def get_file_diff(self, file_path: str) -> str:
         """Get the diff for a specific file."""
-        return self._run_git_command(["diff", "--", file_path])
+        diff = self._run_git_command(["diff", "--color=never", "--", file_path])
+        if not diff:
+            return ""
+            
+        # Convert git diff format to rich/textual markup
+        formatted_lines = []
+        for line in diff.split("\n"):
+            if line.startswith("+"):
+                formatted_lines.append(f"[green]{line}[/]")
+            elif line.startswith("-"):
+                formatted_lines.append(f"[red]{line}[/]")
+            else:
+                formatted_lines.append(line)
+        return "\n".join(formatted_lines)
     
     def _get_change_summary(self) -> tuple[bool, list[Static]]:
         """Get a summary of changes in the repository."""
