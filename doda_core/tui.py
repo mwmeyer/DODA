@@ -45,33 +45,8 @@ class ChatMessage(Static):
         """Render the message."""
         return f"{self.sender}: {self.message}"
 
-class VoiceMode(Container):
-    """Voice mode widget."""
-    
-    def __init__(self) -> None:
-        super().__init__()
-        self.is_listening = False
-    
-    def compose(self) -> ComposeResult:
-        """Compose the voice mode widget."""
-        yield Label("Voice Mode", id="voice-status")
-        yield Button("🎤", variant="default", id="voice-toggle")
-    
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button press."""
-        if event.button.id == "voice-toggle":
-            self.is_listening = not self.is_listening
-            event.button.variant = "error" if self.is_listening else "default"
-            self.post_message(self.VoiceToggled(self.is_listening))
-
-    class VoiceToggled(Message):
-        """Voice mode toggled message."""
-        def __init__(self, is_listening: bool) -> None:
-            self.is_listening = is_listening
-            super().__init__()
-
 class ChatInput(Container):
-    """Chat input container with model selection."""
+    """Chat input container."""
     
     DEFAULT_CSS = """
     ChatInput {
@@ -80,11 +55,6 @@ class ChatInput(Container):
         layout: horizontal;
         background: $panel;
         border-top: solid $primary-lighten-2;
-    }
-    
-    ChatInput #model-select {
-        width: 20;
-        margin-right: 1;
     }
     
     ChatInput #chat-input {
@@ -100,24 +70,20 @@ class ChatInput(Container):
     
     def compose(self) -> ComposeResult:
         """Compose the chat input."""
-        yield Select(
-            [(model, model) for model in ["GPT-4", "GPT-3.5"]], 
-            id="model-select",
-            value="GPT-4"
-        )
         yield Input(placeholder="Ask about the code...", id="chat-input")
-        yield Button("Send", variant="primary", id="chat-send")
+        yield Button("Send", id="chat-send")
 
 class DodaTUI(App):
     """DODA TUI application."""
     
     TITLE = "DODA"
     SUB_TITLE = "Offers Dev Assistance"
-    CSS_PATH = "static/workspace.css"
+    CSS_PATH = "static/styles.css"
     
     show_sidebar = var(True)
     show_chat = var(True)
     voice_mode = var(False)
+    tree_minimized = var(False)
     conversation = Conversation()
     current_file_path = None
     home_dir = os.path.expanduser("~")
@@ -138,14 +104,20 @@ class DodaTUI(App):
                 yield DirectoryTree(self.home_dir, id="workspace-tree")
             with Container(id="editor-container"):
                 with Horizontal(id="editor-header"):
-                    yield Label("", id="file-path-label")
+                    yield Label("No file open", id="file-path-label")
                     yield Label("", id="save-status")
-                yield TextArea(id="workspace-textarea", language="python")
+                yield TextArea(id="workspace-textarea")
             with Container(id="chat-container"):
-                with VerticalScroll(id="chat-messages"):
-                    yield Static("Welcome! Open a file and ask questions about the code.", id="messages-view")
+                yield Static("Welcome! Open a file and ask questions about the code.", id="chat-messages")
                 yield ChatInput()
-            yield VoiceMode()
+            with Container(id="actions-container"):
+                yield Button("💽", id="tree-toggle", classes="action-button")
+                yield Button("🤖", id="ai-button", classes="action-button")
+                yield Button("⚙️", id="settings-button", classes="action-button")
+                yield Button("🔍", id="search-button", classes="action-button")
+                yield Button("❓", id="help-button", classes="action-button")
+                yield Button("🎤", variant="default", id="voice-toggle")
+                yield Label("Voice Mode", id="voice-status")
 
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
         """Handle text area changes."""
@@ -220,7 +192,26 @@ class DodaTUI(App):
         self.show_chat = not self.voice_mode
         self.query_one("#chat-container").display = not self.voice_mode
 
-    def on_voice_mode_voice_toggled(self, event: VoiceMode.VoiceToggled) -> None:
+    def action_toggle_tree(self) -> None:
+        """Toggle tree minimized state."""
+        self.tree_minimized = not self.tree_minimized
+        container = self.query_one("#sidebar-container")
+        container.set_class(self.tree_minimized, "minimized")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button press."""
+        if event.button.id == "voice-toggle":
+            self.is_listening = not self.is_listening
+            event.button.variant = "error" if self.is_listening else "default"
+            self.post_message(self.VoiceToggled(self.is_listening))
+
+    class VoiceToggled(Message):
+        """Voice mode toggled message."""
+        def __init__(self, is_listening: bool) -> None:
+            self.is_listening = is_listening
+            super().__init__()
+
+    def on_voice_mode_voice_toggled(self, event: VoiceToggled) -> None:
         """Handle voice mode toggle."""
         self.voice_mode = event.is_listening
         self.show_chat = not self.voice_mode
@@ -231,13 +222,18 @@ class DodaTUI(App):
         else:
             self.notify("Voice mode deactivated")
 
-    @on(Button.Pressed, "#voice-mode-toggle")
+    @on(Button.Pressed, "#voice-toggle")
     def on_voice_toggle_pressed(self, event: Button.Pressed) -> None:
         """Handle voice mode toggle button press."""
         self.action_toggle_voice()
         # Update button appearance based on mode
-        button = self.query_one("#voice-mode-toggle", Button)
+        button = self.query_one("#voice-toggle", Button)
         button.variant = "error" if self.voice_mode else "primary"
+
+    @on(Button.Pressed, "#tree-toggle")
+    def on_tree_toggle_pressed(self, event: Button.Pressed) -> None:
+        """Handle tree toggle button press."""
+        self.action_toggle_tree()
 
     @on(Button.Pressed, "#chat-send")
     async def on_send_pressed(self, event: Button.Pressed) -> None:
@@ -252,8 +248,7 @@ class DodaTUI(App):
     async def send_chat_message(self) -> None:
         """Send a message to the chat."""
         chat_input = self.query_one("#chat-input", Input)
-        messages_view = self.query_one("#messages-view", Static)
-        model_select = self.query_one("#model-select", Select)
+        messages_view = self.query_one("#chat-messages", Static)
         
         user_message = chat_input.value
         if not user_message.strip():
