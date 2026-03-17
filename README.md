@@ -2,9 +2,20 @@
 
 DODA Offers Dev Assistance.
 
-It is a full featured LLM chat interface that runs natively within a developers terminal to help with system administration, scripting, and any other CLI oriented task.
+A full-featured **AI coding agent** that runs natively in your terminal, powered by local LLMs via [Ollama](https://ollama.com). DODA doesn't just chat — it actually reads, writes, searches, and executes code on your machine.
 
-![doda-gif](doda-intro.gif)
+### Features
+
+- 🧠 **Agentic tool loop** — the AI calls tools (read/write/search/bash) in a loop until the task is done
+- 🔧 **Built-in tools**: `read_file`, `write_file`, `edit_file`, `list_files`, `bash`, `code_search`
+- 🖥️ **TUI with live feedback** — see tool calls and results as the agent works
+- 📁 **File browser** — browse and edit files from the sidebar
+- 🏠 **100% local** — runs with Ollama, no cloud API keys needed
+
+### Prerequisites
+
+- [Ollama](https://ollama.com) installed and running
+- A model pulled, e.g. `ollama pull mistral`
 
 ### Setup
 
@@ -13,32 +24,43 @@ cd doda_core
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env # add openAI ... other values optional
+cp .env.example .env  # tweak model/url if needed
 ```
 
-### Optional .env vars
-
-By default, all functions require confirmation before the LLM calls them.
-To disable this, set `FUNCTION_CONFIRMATION_REQUIRED=false` in the `.env` file.
-
-⚠️ DODA runs code **on your machine**. Be careful with what you allow it to do! ⚠️
-
-### Git Remotes
-
-Creating functions to interact with remote git providers is a promising feature of AI agents. Currently SDKs for both GitLab and GitHub are installed.
-
-`GITLAB_TOKEN` -  https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html
-`GITHUB_TOKEN` - https://github.com/settings/tokens
-
-### Development
+### Run
 
 ```bash
 ./.venv/bin/textual run --dev main.py
 ```
 
-To view a debug console in another tab, run:
-`textual console`
+### Configuration
 
-### Adding new LLM functions
+Edit `doda_core/.env`:
 
-All functions available to the LLM are defined in `doda_core/internal/functions`. To add a new function, create a python file in this directory with a function matching the name and then update the `doda_core/internal/functions.json` file according to the openai function calling description: https://platform.openai.com/docs/guides/function-calling
+```env
+OLLAMA_BASE_URL=http://localhost:11434/v1
+OLLAMA_MODEL=mistral
+FUNCTION_CONFIRMATION_REQUIRED=true
+```
+
+### Development
+
+To view a debug console in another tab:
+```bash
+textual console
+```
+
+### Architecture
+
+```
+doda_core/
+├── agent.py       # Agentic loop + tool definitions + Ollama API
+├── tui.py         # Textual TUI (file browser, editor, chat)
+├── settings.py    # Ollama configuration
+├── main.py        # Entry point
+├── internal/
+│   └── custom_instructions.txt   # System prompt template
+├── static/
+│   └── styles.css
+└── workspace/     # Default working directory for the agent
+```

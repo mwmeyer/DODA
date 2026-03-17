@@ -3,6 +3,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Ollama Configuration
-OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+# Ollama Configuration — uses the NATIVE Ollama API (not OpenAI-compat)
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "mistral")
