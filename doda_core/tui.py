@@ -92,6 +92,47 @@ class DeleteConfirmDialog(ModalScreen):
         self.app.pop_screen()
 
 
+class ShortcutsDialog(ModalScreen):
+    """Dialog displaying keyboard shortcuts and instructions."""
+    DEFAULT_CSS = """
+    ShortcutsDialog { align: center middle; }
+    #shortcuts-dialog {
+        padding: 1 2; width: 60; height: 19;
+        border: thick $primary 80%; background: $surface;
+        layout: vertical;
+    }
+    #shortcuts-title { height: 2; content-align: center middle; text-style: bold; color: $accent; }
+    #shortcuts-content { height: 1fr; margin-bottom: 1; }
+    #shortcuts-close { width: 100%; }
+    """
+
+    def compose(self) -> ComposeResult:
+        shortcuts = """\
+[bold]Global Shortcuts[/bold]
+Ctrl+S       : Save current file
+Ctrl+Q       : Quit DODA
+Ctrl+B       : Toggle file sidebar
+Ctrl+C       : Toggle chat panel
+Ctrl+V       : Voice input (coming soon)
+?            : Show this help dialog
+
+[bold]File Explorer[/bold]
+d / Delete   : Delete selected file or folder
+Enter        : Open file in editor
+
+[bold]Chat[/bold]
+Enter        : Send message (in input box)
+"""
+        with Container(id="shortcuts-dialog"):
+            yield Label("DODA Keyboard Shortcuts", id="shortcuts-title")
+            yield Static(shortcuts, id="shortcuts-content")
+            yield Button("Got it", id="shortcuts-close", variant="primary")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "shortcuts-close":
+            self.app.pop_screen()
+
+
 # ── Tree with delete support ──────────────────────────────────────────────────
 
 class WorkspaceTree(DirectoryTree):
@@ -188,9 +229,11 @@ class DodaTUI(App):
 
     BINDINGS = [
         Binding("ctrl+s", "save", "Save File", show=True),
-        Binding("ctrl+q", "quit", "Quit", key_display="Q / CTRL+C"),
+        Binding("ctrl+q", "quit", "Quit", key_display="Q"),
         Binding("ctrl+b", "toggle_sidebar", "Sidebar"),
-        Binding("ctrl+\\", "toggle_chat", "Toggle Chat"),
+        Binding("ctrl+c", "toggle_chat", "Toggle Chat"),
+        Binding("ctrl+v", "voice_input", "Voice"),
+        Binding("?", "show_shortcuts", "Help"),
     ]
 
     def __init__(self):
@@ -214,6 +257,7 @@ class DodaTUI(App):
             with Container(id="actions-container"):
                 yield Button("Tree", id="tree-toggle", classes="action-button")
                 yield Button("Clear", id="clear-button", classes="action-button")
+                yield Button("Help", id="help-button", classes="action-button")
 
     def on_mount(self) -> None:
         self.query_one("#workspace-textarea").focus()
@@ -222,6 +266,16 @@ class DodaTUI(App):
         os.makedirs(self.workspace_dir, exist_ok=True)
         # Welcome message
         self._append_chat("DODA", f"Ready! Model: [bold]{self.agent.model}[/bold]. Ask me to build something.")
+        # Show shortcuts dialog on boot
+        self.push_screen(ShortcutsDialog())
+
+    def action_show_shortcuts(self) -> None:
+        """Show the shortcuts dialog."""
+        self.push_screen(ShortcutsDialog())
+
+    @on(Button.Pressed, "#help-button")
+    def on_help_pressed(self, event: Button.Pressed) -> None:
+        self.action_show_shortcuts()
 
     # ── File tree ─────────────────────────────────────────────────────────
 
@@ -309,6 +363,9 @@ class DodaTUI(App):
     def action_toggle_sidebar(self) -> None:
         self.show_sidebar = not self.show_sidebar
         self.query_one("#sidebar-container").display = self.show_sidebar
+        
+    def action_voice_input(self) -> None:
+        self.notify("🎙️ Voice input coming soon!", title="Feature Not Implemented")
 
     @on(Button.Pressed, "#tree-toggle")
     def on_tree_toggle_pressed(self, event: Button.Pressed) -> None:
