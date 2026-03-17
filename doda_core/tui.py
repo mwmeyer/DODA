@@ -160,7 +160,7 @@ class DodaTUI(App):
     tree_minimized = var(False)
     conversation = Conversation()
     current_file_path = None
-    home_dir = os.path.expanduser("~")
+    home_dir = os.path.join(os.getcwd(), "workspace")
     has_unsaved_changes = var(False)
 
     BINDINGS = [
