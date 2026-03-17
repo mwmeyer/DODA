@@ -7,6 +7,7 @@ from textual.screen import ModalScreen
 from textual import on, work
 from textual.reactive import var
 import os
+import shutil
 from pathlib import Path
 
 from agent import Agent
@@ -51,7 +52,65 @@ class SaveDialog(ModalScreen):
         self.app.pop_screen()
 
 
+class DeleteConfirmed(Message):
+    """Message sent when user confirms a delete."""
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        super().__init__()
+
+
+class DeleteConfirmDialog(ModalScreen):
+    """Confirmation dialog for deleting a file or folder."""
+    DEFAULT_CSS = """
+    DeleteConfirmDialog { align: center middle; }
+    #delete-dialog {
+        padding: 1 2; width: 60; height: 9;
+        border: thick $error 60%; background: $surface;
+        layout: vertical;
+    }
+    #delete-prompt  { height: 2; content-align: center middle; margin-bottom: 1; }
+    #delete-buttons { height: 3; layout: horizontal; align: center middle; }
+    #delete-yes     { margin-right: 2; }
+    """
+
+    def __init__(self, path: Path) -> None:
+        super().__init__()
+        self.target_path = path
+
+    def compose(self) -> ComposeResult:
+        name = self.target_path.name
+        kind = "folder" if self.target_path.is_dir() else "file"
+        with Container(id="delete-dialog"):
+            yield Label(f"Delete {kind} [bold]{name}[/bold]?", id="delete-prompt")
+            with Horizontal(id="delete-buttons"):
+                yield Button("Delete", id="delete-yes", variant="error")
+                yield Button("Cancel", id="delete-no")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "delete-yes":
+            self.app.post_message(DeleteConfirmed(self.target_path))
+        self.app.pop_screen()
+
+
+# ── Tree with delete support ──────────────────────────────────────────────────
+
+class WorkspaceTree(DirectoryTree):
+    """DirectoryTree with delete support via 'd' or 'Delete' key."""
+
+    BINDINGS = [
+        Binding("d", "delete_node", "Delete", show=True),
+        Binding("delete", "delete_node", "Delete"),
+    ]
+
+    def action_delete_node(self) -> None:
+        """Delete the currently highlighted file or directory."""
+        if self.cursor_node and self.cursor_node.data:
+            path = self.cursor_node.data.path
+            self.app.push_screen(DeleteConfirmDialog(Path(path)))
+
+
 # ── Chat widgets ──────────────────────────────────────────────────────────────
+
 
 class ChatMessage(Static):
     DEFAULT_CSS = """
@@ -70,6 +129,11 @@ class ChatMessage(Static):
         background: $boost; margin-left: 6; margin-right: 6;
         border: dashed $accent; color: $text-muted;
     }
+    ChatMessage.stdout {
+        background: #1a1a2e; margin-left: 8; margin-right: 2;
+        padding: 0 1; margin-top: 0; margin-bottom: 0;
+        color: #00ff41; border: none; height: auto;
+    }
     """
 
     def __init__(self, sender: str, message: str) -> None:
@@ -81,11 +145,15 @@ class ChatMessage(Static):
             css_class = "user"
         elif css_class in ("assistant", "doda"):
             css_class = "assistant"
+        elif "stdout" in css_class:
+            css_class = "stdout"
         else:
             css_class = "tool"
         self.add_class(css_class)
 
     def render(self) -> str:
+        if self.has_class("stdout"):
+            return f"  {self.message}"
         return f"[bold]{self.sender}[/bold]: {self.message}"
 
 
@@ -133,7 +201,7 @@ class DodaTUI(App):
         with Horizontal():
             with Container(id="sidebar-container"):
                 with Vertical(id="sidebar-content"):
-                    yield DirectoryTree(self.workspace_dir, id="workspace-tree")
+                    yield WorkspaceTree(self.workspace_dir, id="workspace-tree")
             with Container(id="editor-container"):
                 with Horizontal(id="editor-header"):
                     yield Label("No file open", id="file-path-label")
@@ -176,6 +244,27 @@ class DodaTUI(App):
             self.sub_title = str(event.path)
         except Exception as e:
             self.notify(f"Error opening file: {str(e)}", severity="error")
+
+    # ── Delete ────────────────────────────────────────────────────────────
+
+    @on(DeleteConfirmed)
+    def handle_delete_confirmed(self, message: DeleteConfirmed) -> None:
+        """Handle confirmed file/folder deletion."""
+        path = message.path
+        try:
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+            self.notify(f"Deleted {path.name}")
+            self._refresh_tree()
+            # Clear editor if the deleted file was open
+            if self.current_file_path and Path(self.current_file_path) == path:
+                self.query_one("#workspace-textarea", TextArea).load_text("")
+                self.query_one("#file-path-label", Label).update("No file open")
+                self.current_file_path = None
+        except Exception as e:
+            self.notify(f"Error deleting: {e}", severity="error")
 
     # ── Save ──────────────────────────────────────────────────────────────
 
@@ -275,13 +364,23 @@ class DodaTUI(App):
             self.call_from_thread(self._append_chat, "🔧 Tool", f"[bold]{name}[/bold]({args_short})")
 
         def on_tool_end(name, result):
+            # Refresh tree after tools that might create/modify files
+            if name in ("write_file", "edit_file", "bash"):
+                self.call_from_thread(self._refresh_tree)
+            if name == "bash":
+                # bash output was already streamed line-by-line
+                return
             preview = result[:300].replace("\n", " ") if result else "(no output)"
             if len(result) > 300:
                 preview += "…"
             self.call_from_thread(self._append_chat, "✅ Result", preview)
 
+        def on_bash_line(line):
+            self.call_from_thread(self._append_chat, "💻 stdout", line)
+
         self.agent.on_tool_start = on_tool_start
         self.agent.on_tool_end = on_tool_end
+        self.agent.on_bash_output = on_bash_line
 
         self.call_from_thread(self.notify, "Agent is working…")
 
@@ -308,6 +407,9 @@ class DodaTUI(App):
         messages_view.scroll_end(animate=False)
 
     def _refresh_tree(self) -> None:
-        """Reload the directory tree."""
-        tree = self.query_one("#workspace-tree", DirectoryTree)
-        tree.reload()
+        """Force-reload the directory tree by resetting its path."""
+        try:
+            tree = self.query_one("#workspace-tree", WorkspaceTree)
+            tree.path = tree.path  # force full re-scan
+        except Exception:
+            pass

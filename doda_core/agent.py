@@ -10,9 +10,11 @@ feeds results back, and loops until the model produces a final text answer.
 
 import os
 import json
+import select
 import subprocess
 import platform
 import textwrap
+import time
 import requests
 import settings
 
@@ -79,18 +81,66 @@ def list_files(path: str = ".") -> str:
         return f"Error listing files: {e}"
 
 
-def bash(command: str) -> str:
-    """Execute a bash command and return stdout + stderr."""
+# Timeouts for bash commands
+BASH_LINE_TIMEOUT = 10   # seconds of silence before we consider it stalled
+BASH_TOTAL_TIMEOUT = 120  # hard cap on total runtime
+
+def bash(command: str, on_output=None) -> str:
+    """
+    Execute a bash command, streaming output line-by-line.
+    Uses select() so interactive/hanging commands get killed
+    after BASH_LINE_TIMEOUT seconds of no output.
+    """
     try:
-        result = subprocess.run(
-            command, shell=True, capture_output=True, text=True, timeout=30,
+        proc = subprocess.Popen(
+            command,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
         )
-        output = result.stdout
-        if result.stderr:
-            output += f"\nSTDERR:\n{result.stderr}"
+
+        lines = []
+        start = time.time()
+        fd = proc.stdout.fileno()
+
+        while True:
+            # Total timeout guard
+            elapsed = time.time() - start
+            if elapsed > BASH_TOTAL_TIMEOUT:
+                proc.kill()
+                lines.append(f"\n(killed: exceeded {BASH_TOTAL_TIMEOUT}s total timeout)")
+                break
+
+            # Wait for data with a per-line timeout
+            ready, _, _ = select.select([fd], [], [], BASH_LINE_TIMEOUT)
+            if not ready:
+                # No output for BASH_LINE_TIMEOUT seconds — likely stuck/interactive
+                proc.kill()
+                lines.append(f"\n(killed: no output for {BASH_LINE_TIMEOUT}s — likely waiting for input)")
+                break
+
+            line = proc.stdout.readline()
+            if line == "":  # EOF
+                break
+
+            line = line.rstrip("\n")
+            lines.append(line)
+            if on_output:
+                on_output(line)
+
+        proc.stdout.close()
+        try:
+            retcode = proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            retcode = -1
+
+        output = "\n".join(lines)
+        if retcode and retcode != 0:
+            output += f"\n(exit code {retcode})"
         return output or "(no output)"
-    except subprocess.TimeoutExpired:
-        return "Error: command timed out after 30s"
     except Exception as e:
         return f"Error running command: {e}"
 
@@ -228,6 +278,12 @@ def _build_system_prompt() -> str:
         - After creating or editing files, verify your work by running them with the bash tool.
         - Explore before editing: use list_files and read_file to understand the project first.
         - Be concise. Act, don't narrate.
+        - NEVER run interactive commands. Always pass non-interactive flags:
+          * npm/npx: use --yes or -y flags
+          * apt: use -y flag
+          * git: use --no-edit or config to avoid prompts
+          * For any command that might prompt for input, find the non-interactive version.
+        - If a command hangs (no output for 10s), it will be killed automatically.
     """)
 
 
@@ -246,6 +302,7 @@ class Agent:
         ]
         self.on_tool_start = None   # callback(tool_name, args_dict)
         self.on_tool_end = None     # callback(tool_name, result_str)
+        self.on_bash_output = None  # callback(line_str) — real-time bash streaming
         self.on_text = None         # callback(text)
         self._max_iterations = 15   # safety guard
 
@@ -295,11 +352,15 @@ class Agent:
                 if self.on_tool_start:
                     self.on_tool_start(fn_name, fn_args)
 
-                dispatcher = TOOL_DISPATCH.get(fn_name)
-                if dispatcher:
-                    result = dispatcher(fn_args)
+                if fn_name == "bash":
+                    # Special-case bash to pass the streaming callback
+                    result = bash(fn_args["command"], on_output=self.on_bash_output)
                 else:
-                    result = f"Unknown tool: {fn_name}"
+                    dispatcher = TOOL_DISPATCH.get(fn_name)
+                    if dispatcher:
+                        result = dispatcher(fn_args)
+                    else:
+                        result = f"Unknown tool: {fn_name}"
 
                 if self.on_tool_end:
                     self.on_tool_end(fn_name, result)
