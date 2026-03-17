@@ -11,8 +11,6 @@ import json
 from chat import Conversation
 import os
 from typing import Optional
-from git_tree import GitDirectoryTree
-from git_preview import GitPreview, FileSelected
 from pathlib import Path
 
 class SavePathSelected(Message):
@@ -177,11 +175,8 @@ class DodaTUI(App):
         """Create child widgets for the app."""
         with Horizontal():
             with Container(id="sidebar-container"):
-                with Horizontal(id="tree-header"):
-                    yield Button("Git Filter", id="git-toggle", classes="header-button")
                 with Vertical(id="sidebar-content"):
-                    yield GitDirectoryTree(self.home_dir, id="workspace-tree")
-                    yield GitPreview(id="git-preview")
+                    yield DirectoryTree(self.home_dir, id="workspace-tree")
             with Container(id="editor-container"):
                 with Horizontal(id="editor-header"):
                     yield Label("No file open", id="file-path-label")
@@ -243,17 +238,6 @@ class DodaTUI(App):
         self.current_file_path = message.path
         self._save_file()
 
-    @on(DirectoryTree.DirectorySelected)
-    def handle_directory_selected(self, event: DirectoryTree.DirectorySelected) -> None:
-        """Handle directory selection in the tree."""
-        # Update git preview if this is in a git repo
-        git_preview = self.query_one("#git-preview", GitPreview)
-        path = Path(event.path)
-        if (path / ".git").exists():
-            git_preview.current_repo = path
-        else:
-            git_preview.current_repo = None
-
     @on(DirectoryTree.FileSelected)
     def handle_file_selected(self, event: DirectoryTree.FileSelected) -> None:
         """Handle file selection in the directory tree."""
@@ -280,52 +264,14 @@ class DodaTUI(App):
             self.has_unsaved_changes = False
             
             self.sub_title = str(event.path)
-            
-            # Update git preview if this is in a git repo
-            git_preview = self.query_one("#git-preview", GitPreview)
-            while path != Path("/"):
-                if (path / ".git").exists():
-                    git_preview.current_repo = path
-                    break
-                path = path.parent
-            else:
-                git_preview.current_repo = None
         except Exception as e:
             self.notify(f"Error opening file: {str(e)}", severity="error")
-
-    @on(FileSelected)  
-    def handle_git_file_selected(self, message: FileSelected) -> None:
-        """Handle git file selection."""
-        try:
-            git_preview = self.query_one("#git-preview", GitPreview)
-            text_area = self.query_one("#workspace-textarea", TextArea)
-            diff_view = self.query_one("#diff-view", DiffView)
-            
-            if message.is_modified:
-                # Show colored diff for modified file
-                diff = git_preview.get_file_diff(message.path)
-                text_area.add_class("hidden")
-                diff_view.remove_class("hidden")
-                diff_view.update_content(diff)
-            else:
-                # Show contents of untracked file
-                path = git_preview.current_repo / message.path
-                with open(path, "r") as f:
-                    content = f.read()
-                diff_view.add_class("hidden")
-                text_area.remove_class("hidden")
-                text_area.load_text(content)
-            
-            # Update file path label
-            label = self.query_one("#file-path-label", Label)
-            label.update(f"Git: {message.path}")
-            
-        except Exception as e:
-            self.notify(f"Error showing file: {str(e)}", severity="error")
 
     def on_mount(self) -> None:
         """Handle app mount."""
         self.query_one("#workspace-textarea").focus()
+        # Update subtitle with model info
+        self.sub_title = f"{self.SUB_TITLE} | {self.conversation.llm_model}"
 
     def action_toggle_chat(self) -> None:
         """Toggle the chat panel."""
@@ -386,15 +332,6 @@ class DodaTUI(App):
     def on_tree_toggle_pressed(self, event: Button.Pressed) -> None:
         """Handle tree toggle button press."""
         self.action_toggle_tree()
-
-    @on(Button.Pressed, "#git-toggle")
-    def on_git_toggle_pressed(self) -> None:
-        """Handle git toggle button press."""
-        tree = self.query_one("#workspace-tree", GitDirectoryTree)
-        tree.toggle_git_only()
-        # Update button text based on state
-        button = self.query_one("#git-toggle", Button)
-        button.label = "All Files" if tree.show_only_git else "Git Filter"
 
     @on(Button.Pressed, "#chat-send")
     async def on_send_pressed(self, event: Button.Pressed) -> None:

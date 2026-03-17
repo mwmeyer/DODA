@@ -1,120 +1,94 @@
 [
-{
-    "type": "function",
-    "function": {
-        "name": "run_command",
-        "description": "function to execute a terminal command on the server",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "command": {
-                    "type": "string",
-                    "description": "The command to run, e.g. ls"
-                }
-            },
-            "required": ["command"]
-        }
-    }
-},
-{
-    "type": "function",
-    "function": {
-        "name": "file_download",
-        "description": "function to download file into ./workspace",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "url": {
-                    "type": "string",
-                    "description": "The url to the file"
-                }
-            },
-            "required": ["url"]
-        }
-    }
-},
-{
-    "type": "function",
-    "function": {
-        "name": "git_diff",
-        "description": "Function to return a git diff",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "repo_name": {
-                    "type": "string",
-                    "description": "name of the repo in the ./workspace directory"
-                }
-            },
-            "required": ["repo_name"]
-        }
-    }
-},
-{
-    "type": "function",
-    "function": {
-        "name": "git_clone",
-        "description": "function to clone a git repo and load into workspace",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "repo_url": {
-                    "type": "string",
-                    "description": "The public url to a git repo"
-                }
-            },
-            "required": ["repo_url"]
-        }
-    }
-},
-{
-    "type": "function",
-    "function": {
-        "name": "gitlab_snippet_create",
-        "description": "Creates a new snippet in GitLab.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "title": {
-                    "type": "string",
-                    "description": "The title of the snippet"
+    {
+        "type": "function",
+        "function": {
+            "name": "run_command",
+            "description": "function to execute a terminal command on the server",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "type": "string",
+                        "description": "The command to run, e.g. ls"
+                    }
                 },
-                "file_name": {
-                    "type": "string",
-                    "description": "The name of the file to be included in the snippet"
+                "required": ["command"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "file_read",
+            "description": "Reads the entire content of a file.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "The path to the file."
+                    }
                 },
-                "content": {
-                    "type": "string",
-                    "description": "The content of the file to be included in the snippet"
+                "required": ["file_path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "file_update",
+            "description": "Updates the content of a file (overwrites it).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "The path to the file."
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "The new content for the file."
+                    }
+                },
+                "required": ["file_path", "content"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_files",
+            "description": "Lists all files in a directory recursively.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory_path": {
+                        "type": "string",
+                        "description": "The path to the directory. Defaults to '.'"
+                    }
                 }
-            },
-            "required": ["title", "file_name", "content"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_files",
+            "description": "Searches for a string in all files recursively using grep.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The search term."
+                    },
+                    "directory_path": {
+                        "type": "string",
+                        "description": "The directory to search in. Defaults to '.'"
+                    }
+                },
+                "required": ["query"]
+            }
         }
     }
-},
-{
-    "type": "function",
-    "function": {
-        "name": "github_gist_create",
-        "description": "Creates a new gist on github.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "title": {
-                    "type": "string",
-                    "description": "The title of the gist"
-                },
-                "file_name": {
-                    "type": "string",
-                    "description": "The name of the file to be included in the gist"
-                },
-                "content": {
-                    "type": "string",
-                    "description": "The content of the file to be included in the gist"
-                }
-            },
-            "required": ["title", "file_name", "content"]
-        }
-    }
-}
 ]

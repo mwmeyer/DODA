@@ -2,13 +2,14 @@ import os
 import json
 
 def file_update(file_path: str, content: str):
-        """Reads the content of a file and returns its sentences.
+        """Updates the content of a file (overwrites it).
 
         Args:
             file_path (str): The path to the file.
+            content (str): The new content for the file.
 
         Returns:
-        json: A JSON object containing the sentences of the file content.
+        json: A JSON object containing the status of the update.
         """
         try:
             if not os.path.isfile(file_path):
